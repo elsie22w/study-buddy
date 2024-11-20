@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "lcd.h" // LCD driver header file
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -97,8 +98,15 @@ int main(void)
   MX_USART2_UART_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  LCD_Init(); // initialize LCD
 
   setRTCAlarm(&hrtc, 15, 0, 0); // sets alarm
+
+  // test display for LCD
+  LCD_Clear();
+  LCD_SetCursor(0,0);
+  LCD_Print("Hello World");
+
 
   /* USER CODE END 2 */
 
