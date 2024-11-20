@@ -53,7 +53,9 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void printCurrentTime();
+void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour);
+void LCD_Init();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

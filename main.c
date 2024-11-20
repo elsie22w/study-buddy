@@ -18,12 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "lcd.h" // LCD driver header file
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include "stdio.h"
+//#include "liquidcrystal_i2c.h"
+#include "i2c-lcd.h"
 
 /* USER CODE END Includes */
 
@@ -43,6 +45,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 RTC_HandleTypeDef hrtc;
 
 UART_HandleTypeDef huart2;
@@ -57,6 +61,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -97,15 +102,67 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_RTC_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+
+
   LCD_Init(); // initialize LCD
+  LCD_Command(0x80);
+  LCD_Print("Hello, World");
 
-  setRTCAlarm(&hrtc, 15, 0, 0); // sets alarm
 
-  // test display for LCD
-  LCD_Clear();
-  LCD_SetCursor(0,0);
-  LCD_Print("Hello World");
+//  setRTCAlarm(&hrtc, 15, 0, 0); // sets alarm
+
+
+//  HD44780_Init(2);
+//    HD44780_Clear();
+//    HD44780_SetCursor(0,0);
+//    HD44780_PrintStr("HELLO");
+//    HD44780_SetCursor(10,1);
+//    HD44780_PrintStr("WORLD");
+//    HAL_Delay(2000);
+//
+//    HD44780_Clear();
+//    HD44780_SetCursor(0,0);
+//    HD44780_PrintStr("HELLO");
+//    HAL_Delay(2000);
+//    HD44780_NoBacklight();
+//    HAL_Delay(2000);
+//    HD44780_Backlight();
+//
+//    HAL_Delay(2000);
+//    HD44780_Cursor();
+//    HAL_Delay(2000);
+//    HD44780_Blink();
+//    HAL_Delay(5000);
+//    HD44780_NoBlink();
+//    HAL_Delay(2000);
+//    HD44780_NoCursor();
+//    HAL_Delay(2000);
+//
+//    HD44780_NoDisplay();
+//    HAL_Delay(2000);
+//    HD44780_Display();
+//
+//    HD44780_Clear();
+//    HD44780_SetCursor(0,0);
+//    HD44780_PrintStr("Learning STM32 with LCD is fun :-)");
+//
+//    for(int x=0; x<40; x=x+1)
+//    {
+//      HD44780_ScrollDisplayLeft();  //HD44780_ScrollDisplayRight();
+//      HAL_Delay(500);
+//    }
+//
+//    char snum[5];
+//    for ( int x = 1; x <= 200 ; x++ )
+//    {
+//    	sprintf(snum,"%d", x);
+//    	HD44780_Clear();
+//    	HD44780_SetCursor(0,0);
+//    	HD44780_PrintStr(snum);
+//    	HAL_Delay (1000);
+//    }
 
 
   /* USER CODE END 2 */
@@ -114,10 +171,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//	  printCurrentTime();
     /* USER CODE END WHILE */
-	  printCurrentTime();
 
-	  HAL_Delay(1000);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -146,9 +202,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 16;
-  RCC_OscInitStruct.PLL.PLLN = 336;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 80;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -168,6 +224,40 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
