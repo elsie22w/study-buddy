@@ -106,9 +106,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 
-  LCD_Init(); // initialize LCD
-  LCD_Command(0x80);
-  LCD_Print("Hello, World");
+//  LCD_Init(); // initialize LCD
+//  LCD_Command(0x80);
+//  LCD_Print("Hello, World");
 
 
 //  setRTCAlarm(&hrtc, 15, 0, 0); // sets alarm
@@ -171,7 +171,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  printCurrentTime();
+	  printCurrentTime();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -300,8 +300,8 @@ static void MX_RTC_Init(void)
 
   /** Initialize RTC and set the Time and Date
   */
-  sTime.Hours = 0x0;
-  sTime.Minutes = 0x0;
+  sTime.Hours = 8;
+  sTime.Minutes = 21;
   sTime.Seconds = 0x0;
   sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sTime.StoreOperation = RTC_STOREOPERATION_RESET;
@@ -426,9 +426,42 @@ void printCurrentTime(){
 			currentTime.Hours, currentTime.Minutes, currentTime.Seconds);
 
 	HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	LCD_Init(); // initialize LCD
+	LCD_Command(0x80);
+	LCD_Print(msg);
 }
 
 void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
+	// sets an alarm to specified time
+	RTC_AlarmTypeDef sAlarm;
+	RTC_TimeTypeDef currentTime;
+
+	HAL_RTC_GetTime(hrtc, &currentTime, FORMAT_BIN); // gets current time
+
+
+	sAlarm.AlarmTime.Seconds = sec;
+	sAlarm.AlarmTime.Minutes = min;
+	sAlarm.AlarmTime.Hours = hour;
+	if(sAlarm.AlarmTime.Seconds >= 60){ // handles second overflow
+		sAlarm.AlarmTime.Seconds -= 60;
+		++sAlarm.AlarmTime.Minutes;
+	}
+	if(sAlarm.AlarmTime.Minutes >= 60){ // handles minute overflow
+			sAlarm.AlarmTime.Minutes -= 60;
+			++sAlarm.AlarmTime.Hours;
+	}
+	if(sAlarm.AlarmTime.Hours >= 24){ // handles hour overflow
+			sAlarm.AlarmTime.Hours -= 24;
+	}
+
+	sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY; // ignores date
+	sAlarm.Alarm = RTC_ALARM_A;
+
+	while(HAL_RTC_SetAlarm_IT(hrtc, &sAlarm, FORMAT_BIN) != HAL_OK){}
+	// keeps on setting alarm until it works
+}
+
+void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 	// sets an alarm to specified time
 	RTC_AlarmTypeDef sAlarm;
 	RTC_TimeTypeDef currentTime;

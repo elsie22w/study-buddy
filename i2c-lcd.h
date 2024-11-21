@@ -10,10 +10,11 @@
 
 #include "stm32f4xx_hal.h"
 
-void lcd_init(void);
-void lcd_command(uint8_t cmd);
-void lcd_data(uint8_t data);
-void lcd_string(char *str);
+void LCD_Init(void);
+void LCD_Send(uint8_t data, uint8_t mode);
+void LCD_Command(uint8_t cmd);
+void LCD_Data(uint8_t data);
+void LCD_Print(char *str);
 
 #define LCD_I2C_ADDRESS (0x27 << 1)
 #define LCD_BACKLIGHT 0x08
