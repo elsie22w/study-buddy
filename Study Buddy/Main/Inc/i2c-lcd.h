@@ -9,6 +9,7 @@
 #define INC_I2C_LCD_H_
 
 #include "stm32f4xx_hal.h"
+#include <stdbool.h>
 
 void LCD_Init(void);
 void LCD_Send(uint8_t data, uint8_t mode);
@@ -19,7 +20,9 @@ void LCD_Cursor_L();
 void LCD_Data(uint8_t data);
 void LCD_Print(char *str);
 
-void LCD_Main_Menu();
+void LCD_CreateChar(uint8_t location, uint8_t *pattern);
+
+//void LCD_Main_Menu(bool status);
 
 #define LCD_I2C_ADDRESS (0x27 << 1)
 #define LCD_BACKLIGHT 0x08

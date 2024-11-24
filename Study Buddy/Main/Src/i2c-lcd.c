@@ -7,6 +7,8 @@
 
 #include "i2c-lcd.h"
 #include "stm32f4xx_hal.h"
+#include <stdio.h>
+#include "stdio.h"
 
 extern I2C_HandleTypeDef hi2c1;
 
@@ -58,11 +60,10 @@ void LCD_Data(uint8_t data){
 	LCD_Send(data, RS_BIT);
 }
 
-void LCD_Print(char *str){
-
-	while (*str){
-		LCD_Data(*str++);
-	}
+void LCD_Print(char *str) {
+    while (*str) {
+            LCD_Data(*str++);
+    }
 }
 
 void LCD_Init(void){
@@ -82,6 +83,16 @@ void LCD_Init(void){
     LCD_Send(0x06, 0);  // Entry mode set: Increment cursor
     LCD_Send(0x0C, 0);  // Display on, cursor off
 }
+
+void LCD_CreateChar(uint8_t location, uint8_t *pattern) {
+    location &= 0x07; // Only 8 locations (0-7) are valid
+    LCD_Command(0x40 | (location << 3)); // Set CGRAM address
+    for (int i = 0; i < 8; i++) {
+        LCD_Data(pattern[i]); // Write each byte to CGRAM
+    }
+}
+
+
 
 
 
