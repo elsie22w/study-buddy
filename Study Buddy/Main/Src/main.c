@@ -24,7 +24,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "stdio.h"
-//#include "liquidcrystal_i2c.h"
 #include "i2c-lcd.h"
 
 /* USER CODE END Includes */
@@ -49,10 +48,12 @@ I2C_HandleTypeDef hi2c1;
 
 RTC_HandleTypeDef hrtc;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 char msg[20];
+char receivedButton;
 
 /* USER CODE END PV */
 
@@ -62,6 +63,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -103,66 +105,21 @@ int main(void)
   MX_USART2_UART_Init();
   MX_RTC_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
 
-  LCD_Init(); // initialize LCD
-  LCD_Command(0x80);
-  LCD_Print("Hello, World");
+//  LCD_Init(); // initialize LCD
+//  LCD_Command(0x80);
+//  LCD_Print("Hello, World");
 
 
 //  setRTCAlarm(&hrtc, 15, 0, 0); // sets alarm
 
-
-//  HD44780_Init(2);
-//    HD44780_Clear();
-//    HD44780_SetCursor(0,0);
-//    HD44780_PrintStr("HELLO");
-//    HD44780_SetCursor(10,1);
-//    HD44780_PrintStr("WORLD");
-//    HAL_Delay(2000);
-//
-//    HD44780_Clear();
-//    HD44780_SetCursor(0,0);
-//    HD44780_PrintStr("HELLO");
-//    HAL_Delay(2000);
-//    HD44780_NoBacklight();
-//    HAL_Delay(2000);
-//    HD44780_Backlight();
-//
-//    HAL_Delay(2000);
-//    HD44780_Cursor();
-//    HAL_Delay(2000);
-//    HD44780_Blink();
-//    HAL_Delay(5000);
-//    HD44780_NoBlink();
-//    HAL_Delay(2000);
-//    HD44780_NoCursor();
-//    HAL_Delay(2000);
-//
-//    HD44780_NoDisplay();
-//    HAL_Delay(2000);
-//    HD44780_Display();
-//
-//    HD44780_Clear();
-//    HD44780_SetCursor(0,0);
-//    HD44780_PrintStr("Learning STM32 with LCD is fun :-)");
-//
-//    for(int x=0; x<40; x=x+1)
-//    {
-//      HD44780_ScrollDisplayLeft();  //HD44780_ScrollDisplayRight();
-//      HAL_Delay(500);
-//    }
-//
-//    char snum[5];
-//    for ( int x = 1; x <= 200 ; x++ )
-//    {
-//    	sprintf(snum,"%d", x);
-//    	HD44780_Clear();
-//    	HD44780_SetCursor(0,0);
-//    	HD44780_PrintStr(snum);
-//    	HAL_Delay (1000);
-//    }
+  	  LCD_Init();
+  	  LCD_Clear();
+  	  LCD_Command(0x0F); // Display on, cursor on, blinking cursor on
+  	  LCD_Command(0x80);
 
 
   /* USER CODE END 2 */
@@ -172,6 +129,23 @@ int main(void)
   while (1)
   {
 //	  printCurrentTime();
+	  if (HAL_UART_Receive(&huart1, (uint8_t*)&receivedButton, 1, HAL_MAX_DELAY) == HAL_OK) {
+	          // Format received button for UART transmission
+	          sprintf(msg, "%c\r\n", receivedButton);
+	          HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+	          // Handle received button for LCD
+	          if (receivedButton == 'L') {
+	              LCD_Command(0x10); // Move cursor left
+	          }
+	          else if (receivedButton == 'R') {
+	              LCD_Command(0x14); // Move cursor right
+	          }
+	          else {
+	              sprintf(msg, "%c", receivedButton); // Only send the character to LCD
+	              LCD_Print(msg); // Display the received character
+	          }
+	      }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -343,6 +317,40 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+//	_HAL_RCC_USART1_CLK_ENABLE();
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600; // org: 115200
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -426,9 +434,41 @@ void printCurrentTime(){
 			currentTime.Hours, currentTime.Minutes, currentTime.Seconds);
 
 	HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	LCD_Clear(); // initialize LCD
+	LCD_Print(msg);
 }
 
 void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
+	// sets an alarm to specified time
+	RTC_AlarmTypeDef sAlarm;
+	RTC_TimeTypeDef currentTime;
+
+	HAL_RTC_GetTime(hrtc, &currentTime, FORMAT_BIN); // gets current time
+
+
+	sAlarm.AlarmTime.Seconds = sec;
+	sAlarm.AlarmTime.Minutes = min;
+	sAlarm.AlarmTime.Hours = hour;
+	if(sAlarm.AlarmTime.Seconds >= 60){ // handles second overflow
+		sAlarm.AlarmTime.Seconds -= 60;
+		++sAlarm.AlarmTime.Minutes;
+	}
+	if(sAlarm.AlarmTime.Minutes >= 60){ // handles minute overflow
+			sAlarm.AlarmTime.Minutes -= 60;
+			++sAlarm.AlarmTime.Hours;
+	}
+	if(sAlarm.AlarmTime.Hours >= 24){ // handles hour overflow
+			sAlarm.AlarmTime.Hours -= 24;
+	}
+
+	sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY; // ignores date
+	sAlarm.Alarm = RTC_ALARM_A;
+
+	while(HAL_RTC_SetAlarm_IT(hrtc, &sAlarm, FORMAT_BIN) != HAL_OK){}
+	// keeps on setting alarm until it works
+}
+
+void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 	// sets an alarm to specified time
 	RTC_AlarmTypeDef sAlarm;
 	RTC_TimeTypeDef currentTime;

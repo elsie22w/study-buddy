@@ -39,6 +39,21 @@ void LCD_Command(uint8_t cmd){
 	LCD_Send(cmd, 0);
 }
 
+void LCD_Clear(void) {
+    LCD_Command(0x01);  // Clear display
+    HAL_Delay(2);       // Wait for the clear command to execute
+}
+
+void LCD_Cursor_R(){
+	LCD_Command(0x14);
+	HAL_Delay(2);
+}
+
+void LCD_Cursor_L(){
+	LCD_Command(0x10);
+	HAL_Delay(2);
+}
+
 void LCD_Data(uint8_t data){
 	LCD_Send(data, RS_BIT);
 }
