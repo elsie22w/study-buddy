@@ -49,17 +49,56 @@ I2C_HandleTypeDef hi2c1;
 
 RTC_HandleTypeDef hrtc;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 char msg[20];
 char receivedButton;
-int curScreen = TIME_SETUP;
+int curScreen = MAIN;
+int alarmSet = 0;
+int timerSet = 0;
+int melody[] = {
+    NOTE_C4, NOTE_G4, NOTE_F4, NOTE_C4, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_C4, NOTE_F4, NOTE_C4, NOTE_E4, NOTE_E4, NOTE_F4,
+    NOTE_C4, NOTE_G4, NOTE_F4, NOTE_C4, NOTE_E4, NOTE_E4, NOTE_F4, NOTE_C4, NOTE_F4, NOTE_A4, NOTE_G4, NOTE_F4, NOTE_G4
+};
+int noteDurations[] = {
+    450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450,
+	450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450, 450
+};
+int alarmTriggered = 0;
+uint8_t clock[8] = {0x00,
+		  			0x00,
+					0x0E,
+					0x15,
+					0x17,
+					0x11,
+					0x0E,
+					0x00};
 
-//uint8_t CHAR_CLOCK = 0x00;
-//int MENU = 0;
+uint8_t bell[8] = {
+  0x00,
+  0x04,
+  0x0E,
+  0x0E,
+  0x0E,
+  0x1F,
+  0x00,
+  0x04
+};
 
+uint8_t check[8] = {
+	0x00,
+	0x00,
+	0x00,
+	0x01,
+	0x02,
+	0x14,
+	0x08,
+	0x00
+};
 
 /* USER CODE END PV */
 
@@ -70,6 +109,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -112,15 +152,10 @@ int main(void)
   MX_RTC_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-
-//  LCD_Init(); // initialize LCD
-//  LCD_Command(0x80);
-//  LCD_Print("Hello, World");
-
-
-  setRTCTimer(&hrtc, 50, 0, 0); // sets alarm
+  HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A);
 
   LCD_Init();
   LCD_Clear();
@@ -128,12 +163,20 @@ int main(void)
   LCD_Command(0x80);
 
   HAL_Delay(50);
-  LCD_Menu(curScreen);
-  curScreen = DATE_SETUP;
-  LCD_Menu(curScreen);
+  LCD_Menu(TIME_SETUP);
+  LCD_Menu(DATE_SETUP);
+
+
+//  setRTCTimer(&hrtc, 15, 0, 0);
+//  timerSet = 1;
 
 
   //  LCD_CreateChar(0, clock); //
+
+  LCD_CreateCustomChar(CHAR_CLOCK, clock);
+  LCD_CreateCustomChar(CHAR_BELL, bell);
+  LCD_CreateCustomChar(CHAR_CHECK, check);
+
 //  LCD_Data(CHAR_CLOCK);
 //  LCD_Print("Hello!");
 
@@ -145,18 +188,24 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  curScreen = MAIN;
 //	  printCurrentTime();
-	  if (LCD_Menu(curScreen) == SET_TIMER){
-		  curScreen = SET_TIMER;
-	  } else {
-		  curScreen = MAIN;
-		  LCD_Menu(curScreen);
-	  }
+	  				sprintf(msg, "T:%d\r\n", curScreen);
+	  				HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	  				int menuResult = LCD_Menu(curScreen);  // Process current menu
+	  				    if (menuResult == SET_TIMER) {
+	  				        curScreen = SET_TIMER;  // After setting the timer, return to the main menu
+	  				        timerSet = 1;      // Indicate that the timer is set
+	  				    } else if (menuResult == SET_ALARM) {
+	  				        curScreen = SET_ALARM;  // After setting the alarm, return to the main menu
+	  				        alarmSet = 1;      // Indicate that the alarm is set
+	  				    } else if (menuResult == MAIN) {
+	  				        curScreen = MAIN;  // Stay in the main menu
+	  				    }
+  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+
   /* USER CODE END 3 */
 }
 
@@ -250,7 +299,8 @@ static void MX_RTC_Init(void)
 {
 
   /* USER CODE BEGIN RTC_Init 0 */
-
+	HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
   /* USER CODE END RTC_Init 0 */
 
   RTC_TimeTypeDef sTime = {0};
@@ -324,6 +374,65 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 83;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 499;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 250;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -340,7 +449,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600; // org: 115200
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -408,7 +517,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -416,12 +531,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin PA7 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -429,7 +558,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void printCurrentTime(){
-	// prints the current time to the console (debugging purposes)
 	RTC_TimeTypeDef currentTime;
 	RTC_DateTypeDef currentDate;
 
@@ -437,15 +565,7 @@ void printCurrentTime(){
 	HAL_RTC_GetDate(&hrtc, &currentDate, FORMAT_BIN);
 
 	sprintf(msg, "%02d:%02d:%02d", currentTime.Hours, currentTime.Minutes, currentTime.Seconds);
-
-	    // Send the time to the console for debugging
-	    HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-	    // Update the LCD
-//	    LCD_Command(0x80);   // Move cursor to the first line, first column
-//	    LCD_Print("Time:");  // Print a static label
-//	    LCD_Command(0xC0);   // Move cursor to the second line
-//	    LCD_Print(msg);      // Print the current time
+	HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 }
 
 int LCD_Menu(int menu){
@@ -454,49 +574,81 @@ int LCD_Menu(int menu){
 		char dateBuffer[10];
 		char menuLine1[20];    // Buffer for full LCD line (adjust size as needed)
 		char menuLine2[20];
+		char remainBuffer[10] = {0};
 		int pos = 0;
+		uint32_t lastUpdate = HAL_GetTick(); // For time updates
 
 		RTC_TimeTypeDef currentTime;
 		RTC_DateTypeDef currentDate;
 
 						    // Get the current time and date
-		HAL_RTC_GetTime(&hrtc, &currentTime, FORMAT_BIN);
-		HAL_RTC_GetDate(&hrtc, &currentDate, FORMAT_BIN);
-
-		//				    // Format the time as "HH:MM"
-		//		LCD_Data(CHAR_CLOCK);
-		snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", currentTime.Hours, currentTime.Minutes);
-		snprintf(dateBuffer, sizeof(dateBuffer), "%02d-%02d", currentDate.Month, currentDate.Date);
-						    // Construct the menu string for the first line: "T HH:MM    X"
-		snprintf(menuLine1, sizeof(menuLine1), "C%s    MSEWTA", timeBuffer);
-		snprintf(menuLine2, sizeof(menuLine2), "%s  XHH:MM:SS", dateBuffer);
-
-						     //Display the menu on the LCD
-		LCD_Command(0x80);     // Move cursor to the first line, first column
-		LCD_Print(menuLine1);  // Print the formatted menu string
-		LCD_Command(0xC0);
-		LCD_Print(menuLine2);
-
-
-		//		LCD_Print("T");
-		LCD_Command(0x80);
-
 		while (true){
-			if (HAL_UART_Receive(&huart1, (uint8_t*)&receivedButton, 1, HAL_MAX_DELAY) == HAL_OK) {
-				// Format received button for UART transmission
-				// Handle received button for LCD
+			if (HAL_UART_Receive(&huart1, (uint8_t*)&receivedButton, 1, 10) == HAL_OK){
+				sprintf(msg, "%d\r\n", pos);
+											HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 				if (receivedButton == 'L') {
 					LCD_Command(0x10); // Move cursor left
 					--pos;
+					LCD_Command(0x80 + pos); // Update cursor position
 				}
 				else if (receivedButton == 'R') {
 					LCD_Command(0x14); // Move cursor right
 					++pos;
+					LCD_Command(0x80 + pos); // Update cursor position
 				} else if ((pos == 14) && (receivedButton == '0')){
-//					LCD_Menu(SET_TIMER);
 					return SET_TIMER;
-					break;
+				} else if ((pos == 15) && (receivedButton == '0')){
+					return SET_ALARM;
 				}
+			}
+			if (HAL_GetTick() - lastUpdate >= 1000) { // 1-second interval
+			    lastUpdate = HAL_GetTick();
+				HAL_RTC_GetTime(&hrtc, &currentTime, FORMAT_BIN);
+				HAL_RTC_GetDate(&hrtc, &currentDate, FORMAT_BIN);
+
+						//				    // Format the time as "HH:MM"
+						//		LCD_Data(CHAR_CLOCK);
+				snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", currentTime.Hours, currentTime.Minutes);
+				snprintf(dateBuffer, sizeof(dateBuffer), "%02d-%02d", currentDate.Month, currentDate.Date);
+
+				if (timerSet){
+					timeRemainingRTCTimer(&hrtc, remainBuffer);
+				} else if (alarmSet){
+					alarmTimeRTCAlarm(&hrtc, remainBuffer);
+				} else {
+					for (int i = 0; i < 10; i++) {
+					    remainBuffer[i] = 0;
+					}
+				}
+											// Construct the menu string for the first line: "T HH:MM    X"
+				snprintf(menuLine1, sizeof(menuLine1), "%s         Z", timeBuffer);
+				snprintf(menuLine2, sizeof(menuLine2), "%s   %s", dateBuffer,remainBuffer);
+				uint8_t savedCursorPos = pos;
+											 //Display the menu on the LCD
+				LCD_Command(0x80);     // Move cursor to the first line, first column
+				LCD_DisplayCustomChar(CHAR_CLOCK);
+				LCD_Command(0x80+1);
+				LCD_Print(menuLine1);  // Print the formatted menu string
+				LCD_Command(0xC0);
+				LCD_Print(menuLine2);
+				LCD_Command(0x80);
+				LCD_Command(0x80+14);
+				LCD_DisplayCustomChar(CHAR_BELL);
+
+
+				LCD_Command(0x80 + savedCursorPos);
+
+			}
+			if (alarmTriggered){
+				LCD_Command(0xC0+8);
+				LCD_Print("TIMES UP");
+				playTone();
+				flashRGB();
+				LCD_Command(0xC0+6);
+				LCD_Clear();
+				alarmTriggered = 0;
+				timerSet = 0;
+				alarmSet = 0;
 			}
 		}
 	} else if (menu == TIME_SETUP){
@@ -507,11 +659,11 @@ int LCD_Menu(int menu){
 		LCD_Print("Current Time:");
 		LCD_Command(0xC0);
 		LCD_Print("HH:MM Y");
+//		LCD_Command(0xC0+6);
+//		LCD_DisplayCustomChar(CHAR_CHECK);
 		LCD_Command(0xC0);
 		while (true){
 			if (HAL_UART_Receive(&huart1, (uint8_t*)&receivedButton, 1, HAL_MAX_DELAY) == HAL_OK) {
-					// Format received button for UART transmission
-					// Handle received button for LCD
 					if (receivedButton == 'L') {
 						LCD_Command(0x10); // Move cursor left
 						--pos;
@@ -523,12 +675,9 @@ int LCD_Menu(int menu){
 					else {
 						if ((pos == 6) && (receivedButton == '0')){
 							LCD_Clear();
-							sprintf(msg, "%d\r\n", array[0]);
-							HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 							RTC_TimeTypeDef sTime;
 
-							    // Set time to 15:30:00 (3:30 PM)
 							sTime.Hours = array[0]*10+array[1];    // 3 PM (in 24-hour format)
 							sTime.Minutes = array[3]*10+array[4];  // 30 minutes
 							sTime.Seconds = 0;   // 0 seconds
@@ -538,8 +687,6 @@ int LCD_Menu(int menu){
 
 							    // Set the time using HAL_RTC_SetTime function
 							if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
-								sprintf(msg, "Error setting time\r\n");
-								    HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 								Error_Handler();}
 							return MAIN;
 							break;
@@ -550,8 +697,6 @@ int LCD_Menu(int menu){
 							++pos;
 						}
 					}
-					sprintf(msg, "%d\r\n", array[0]);
-					HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 
 				}
@@ -596,8 +741,6 @@ int LCD_Menu(int menu){
 						++pos;
 					}
 				}
-				sprintf(msg, "%d\r\n", pos);
-				HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
 
 			}
@@ -628,8 +771,11 @@ int LCD_Menu(int menu){
 								if ((pos == 9) && (receivedButton == '0')){
 									LCD_Clear();
 									setRTCTimer(&hrtc, array[6]*10+array[7], array[3]*10+array[4], array[0]*10+array[1]);
+									pos = 0;
+									LCD_Command(0x80);
 									return MAIN;
 									break;
+
 								} else if (pos == 0 || pos == 1 || pos == 3 || pos == 4 || pos == 6 || pos == 7){
 									sprintf(msg, "%c", receivedButton); // Only send the character to LCD
 									LCD_Print(msg); // Display the received character
@@ -637,18 +783,52 @@ int LCD_Menu(int menu){
 									++pos;
 								}
 							}
-							sprintf(msg, "%d\r\n", pos);
-							HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-
 						}
 				}
-	}
+	}else if (menu == SET_ALARM){
+			int pos = 0;
+			int array[5];
+
+			LCD_Clear();
+			LCD_Command(0x80);
+			LCD_Print("Alarm End:");
+			LCD_Command(0xC0);
+			LCD_Print("HH:MM Y");
+			LCD_Command(0xC0);
+			while (true){
+				if (HAL_UART_Receive(&huart1, (uint8_t*)&receivedButton, 1, HAL_MAX_DELAY) == HAL_OK) {
+								// Format received button for UART transmission
+								// Handle received button for LCD
+								if (receivedButton == 'L') {
+									LCD_Command(0x10); // Move cursor left
+									--pos;
+								}
+								else if (receivedButton == 'R') {
+									LCD_Command(0x14); // Move cursor right
+									++pos;
+								}
+								else {
+									if ((pos == 6) && (receivedButton == '0')){
+										LCD_Clear();
+										setRTCAlarm(&hrtc, array[3]*10+array[4], array[0]*10+array[1]);
+										return MAIN;
+										break;
+									} else if (pos == 0 || pos == 1 || pos == 3 || pos == 4 ){
+										sprintf(msg, "%c", receivedButton); // Only send the character to LCD
+										LCD_Print(msg); // Display the received character
+										array[pos] = receivedButton - '0';
+										++pos;
+									}
+								}
+							}
+					}
+		}
+
 	return 1;
 }
 
 
-void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
+void setRTCAlarm(RTC_HandleTypeDef *hrtc, int min, int hour){
 	// sets an alarm to specified time
 	RTC_AlarmTypeDef sAlarm;
 	RTC_TimeTypeDef currentTime;
@@ -656,13 +836,9 @@ void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 	HAL_RTC_GetTime(hrtc, &currentTime, FORMAT_BIN); // gets current time
 
 
-	sAlarm.AlarmTime.Seconds = sec;
+	sAlarm.AlarmTime.Seconds = 0;
 	sAlarm.AlarmTime.Minutes = min;
 	sAlarm.AlarmTime.Hours = hour;
-	if(sAlarm.AlarmTime.Seconds >= 60){ // handles second overflow
-		sAlarm.AlarmTime.Seconds -= 60;
-		++sAlarm.AlarmTime.Minutes;
-	}
 	if(sAlarm.AlarmTime.Minutes >= 60){ // handles minute overflow
 			sAlarm.AlarmTime.Minutes -= 60;
 			++sAlarm.AlarmTime.Hours;
@@ -696,6 +872,9 @@ void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 	new_minutes %= 60;
 	new_hours %= 24;
 
+	if (hour == 0 && min == 0 && sec == 0) {
+	    new_seconds += 1;  // Prevent alarm from being set to the current second
+	}
 	    // Set the alarm time
 	sAlarm.AlarmTime.Seconds = new_seconds;
 	sAlarm.AlarmTime.Minutes = new_minutes;
@@ -705,9 +884,9 @@ void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 	sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
 
 	    // Configure the alarm
-	sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
+	sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY; // ignores date
 	sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
-	sAlarm.AlarmDateWeekDay = 0x1; // Current day (placeholder)
+	sAlarm.AlarmDateWeekDay = RTC_WEEKDAY_MONDAY; // Current day (placeholder)
 	sAlarm.Alarm = RTC_ALARM_A;
 
 	    // Set the alarm and enable interrupt
@@ -717,9 +896,138 @@ void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour){
 }
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc){
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // toggles pin on alarm
-//	LCD_Clear();
+	sprintf(msg, "%s\r\n", "Alarm Triggered!");
+	HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
+
+	if (HAL_RTC_DeactivateAlarm(hrtc, RTC_ALARM_A) != HAL_OK) {
+	        // Handle deactivation error
+	        sprintf(msg, "Failed to deactivate alarm\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	    }
+
+	alarmTriggered = 1;
+
+//	LCD_Print("Alarm Triggered!"); // Example
+
+//	LCD_Clear();
+}
+
+void timeRemainingRTCTimer(RTC_HandleTypeDef *hrtc, char *msg){
+	RTC_TimeTypeDef currentTime;
+	RTC_DateTypeDef currentDate;
+    RTC_AlarmTypeDef alarmTime;
+
+    HAL_RTC_GetTime(hrtc, &currentTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(hrtc, &currentDate, RTC_FORMAT_BIN);
+
+    if (HAL_RTC_GetAlarm(hrtc, &alarmTime, RTC_ALARM_A, RTC_FORMAT_BIN) == HAL_OK) {
+    	uint32_t currentSeconds = currentTime.Hours * 3600 + currentTime.Minutes * 60 + currentTime.Seconds;
+    	uint32_t alarmSeconds = alarmTime.AlarmTime.Hours * 3600 + alarmTime.AlarmTime.Minutes * 60 + alarmTime.AlarmTime.Seconds;
+
+        uint32_t secondsLeft;
+
+        if (currentSeconds <= alarmSeconds) {
+                // Alarm is later today
+        	secondsLeft = alarmSeconds - currentSeconds;
+        } else {
+                // Alarm is for the next day
+        	secondsLeft = ((24 * 3600) - currentSeconds) + alarmSeconds;
+        }
+        uint8_t hours = secondsLeft / 3600;
+        uint8_t minutes = (secondsLeft % 3600) / 60;
+        uint8_t seconds = secondsLeft % 60;
+
+        snprintf(msg, 10, "%02d:%02d:%02d", hours, minutes, seconds);
+    } else {
+    	// Handle error in retrieving alarm
+    	char errorMsg[] = "Error reading RTC alarm\r\n";
+    	HAL_UART_Transmit(&huart2, (uint8_t *)errorMsg, strlen(errorMsg), HAL_MAX_DELAY);
+    }
+}
+
+void alarmTimeRTCAlarm(RTC_HandleTypeDef *hrtc, char *msg){
+	RTC_TimeTypeDef currentTime;
+	RTC_DateTypeDef currentDate;
+    RTC_AlarmTypeDef alarmTime;
+
+    HAL_RTC_GetTime(hrtc, &currentTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(hrtc, &currentDate, RTC_FORMAT_BIN);
+
+    if (HAL_RTC_GetAlarm(hrtc, &alarmTime, RTC_ALARM_A, RTC_FORMAT_BIN) == HAL_OK) {
+        snprintf(msg, 10, "   %02d:%02d", alarmTime.AlarmTime.Hours, alarmTime.AlarmTime.Minutes);
+    } else {
+    	// Handle error in retrieving alarm
+    	char errorMsg[] = "Error reading RTC alarm\r\n";
+    	HAL_UART_Transmit(&huart2, (uint8_t *)errorMsg, strlen(errorMsg), HAL_MAX_DELAY);
+    }
+}
+
+void setTone(int frequency) {
+    // If the frequency is 0, stop the tone
+    if (frequency == 0) {
+        HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_2);
+        return;
+    }
+
+    // Calculate the period (ARR value) for the frequency
+    uint32_t period = HAL_RCC_GetPCLK1Freq() / (htim2.Init.Prescaler + 1) / frequency - 1;
+
+    // Update the PWM frequency (period)
+    __HAL_TIM_SET_AUTORELOAD(&htim2, period);
+
+    // Set the duty cycle (50% duty cycle for simplicity)
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, period / 2);
+
+    // Start PWM output
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+}
+
+void playTone(){
+	for (int i = 0; i < sizeof(melody) / sizeof(melody[0]); i++) {
+		        int note = melody[i];
+		        int duration = noteDurations[i];
+
+		        // Play the note
+		        setTone(note);
+
+		        // Wait for the note to finish playing
+		        HAL_Delay(duration);
+
+		        // Stop the tone after the note duration
+		        setTone(0);  // Stop the tone
+	        HAL_Delay(20);  // Short delay between notes
+	}
+}
+
+void setRGB(uint8_t red, uint8_t green, uint8_t blue) {
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, red ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, green ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, blue ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+void flashRGB(){
+	HAL_Delay(500);
+	setRGB(0,0,1);
+	HAL_Delay(500);
+	setRGB(0,0,0);
+	HAL_Delay(500);
+	setRGB(0,0,1);
+	HAL_Delay(500);
+	setRGB(0,0,0);
+	HAL_Delay(500);
+	setRGB(0,0,1);
+	HAL_Delay(500);
+	setRGB(0,0,0);
+	HAL_Delay(500);
+	setRGB(0,0,1);
+	HAL_Delay(500);
+	setRGB(0,0,0);
+	HAL_Delay(500);
+	setRGB(0,0,1);
+	HAL_Delay(500);
+	setRGB(0,0,0);
+	HAL_Delay(500);
 }
 
 /* USER CODE END 4 */

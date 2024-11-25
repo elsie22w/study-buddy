@@ -49,15 +49,23 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void printCurrentTime();
-void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour);
+void setRTCAlarm(RTC_HandleTypeDef *hrtc, int min, int hour);
 void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour);
+void timeRemainingRTCTimer(RTC_HandleTypeDef *hrtc, char *msg);
+void alarmTimeRTCAlarm(RTC_HandleTypeDef *hrtc, char *msg);
 void LCD_Init();
 int LCD_Menu(int menu);
+void setTone(int frequency);
+void playTone();
+void setRGB(uint8_t red, uint8_t green, uint8_t blue);
+void flashRGB();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -78,11 +86,27 @@ int LCD_Menu(int menu);
 
 /* USER CODE BEGIN Private defines */
 #define CHAR_CLOCK 0x00
+#define CHAR_BELL 0x01
+#define CHAR_CHECK 0x02
 #define TIME_SETUP 0
 #define DATE_SETUP 1
 #define MAIN 2
 #define SET_TIMER 3
 #define SET_ALARM 4
+// Frequencies for musical notes (in Hz)
+
+#define NOTE_C4 261
+#define NOTE_CS4 277
+#define NOTE_D4 293
+#define NOTE_DS4 311
+#define NOTE_E4 329
+#define NOTE_F4 349
+#define NOTE_FS4 370
+#define NOTE_G4 392
+#define NOTE_GS4 415
+#define NOTE_A4 440   // Standard A
+#define NOTE_AS4 466
+#define NOTE_B4 493
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
