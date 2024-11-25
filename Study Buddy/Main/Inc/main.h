@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -55,7 +55,9 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void printCurrentTime();
 void setRTCAlarm(RTC_HandleTypeDef *hrtc, int sec, int min, int hour);
+void setRTCTimer(RTC_HandleTypeDef *hrtc, int sec, int min, int hour);
 void LCD_Init();
+int LCD_Menu(int menu);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -75,7 +77,12 @@ void LCD_Init();
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define CHAR_CLOCK 0x00
+#define TIME_SETUP 0
+#define DATE_SETUP 1
+#define MAIN 2
+#define SET_TIMER 3
+#define SET_ALARM 4
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
